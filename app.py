@@ -1,14 +1,219 @@
 """Interface Streamlit pour presenter les resultats au jury."""
 
+from html import escape
 from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 from fraud_detection import detect_fraud, load_transactions
 
 SAMPLE_CSV = Path(__file__).parent / "data" / "sample_transactions.csv"
 UNKNOWN = "Indisponible"
+
+APP_STYLE = """
+<style>
+:root {
+    --panel: #0b1016;
+    --line: rgba(161, 190, 205, 0.18);
+    --line-strong: rgba(106, 222, 255, 0.38);
+    --text: #edf6fb;
+    --muted: #91a7b5;
+    --cyan: #5fe1ff;
+    --green: #48e29a;
+    --red: #ff6578;
+}
+
+.stApp {
+    background:
+        linear-gradient(180deg, rgba(8, 13, 18, 0.94), rgba(5, 7, 10, 1)),
+        #05070a;
+    color: var(--text);
+}
+
+.stApp::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    background-image:
+        linear-gradient(rgba(95, 225, 255, 0.045) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(95, 225, 255, 0.035) 1px, transparent 1px);
+    background-size: 42px 42px;
+    mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.72), transparent 78%);
+}
+
+section[data-testid="stSidebar"] {
+    background: #080d12;
+    border-right: 1px solid var(--line);
+}
+
+header[data-testid="stHeader"],
+div[data-testid="stToolbar"] {
+    background: rgba(5, 7, 10, 0.72);
+    backdrop-filter: blur(14px);
+}
+
+main .block-container {
+    max-width: 1480px;
+    padding-top: 2rem;
+}
+
+h1, h2, h3, h4, h5, h6, label, p, span {
+    color: var(--text);
+}
+
+h1, h2, h3 {
+    letter-spacing: 0;
+}
+
+a {
+    color: var(--cyan);
+}
+
+div[data-testid="stCaptionContainer"] {
+    color: var(--muted);
+}
+
+.command-deck {
+    min-height: 250px;
+    padding: 24px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background:
+        linear-gradient(145deg, rgba(16, 24, 33, 0.94), rgba(5, 8, 12, 0.98)),
+        #0b1016;
+    box-shadow:
+        0 28px 80px rgba(0, 0, 0, 0.52),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.deck-overline {
+    color: var(--cyan);
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.deck-title {
+    margin-top: 14px;
+    font-size: clamp(1.8rem, 3vw, 3rem);
+    font-weight: 800;
+    line-height: 1;
+    color: var(--text);
+}
+
+.deck-text {
+    max-width: 760px;
+    margin-top: 12px;
+    color: #b8cbd5;
+    font-size: 1rem;
+    line-height: 1.55;
+}
+
+.deck-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 22px;
+}
+
+.deck-cell {
+    padding: 14px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.035);
+}
+
+.deck-cell span {
+    display: block;
+    color: var(--muted);
+    font-size: 0.76rem;
+}
+
+.deck-cell strong {
+    display: block;
+    margin-top: 8px;
+    color: var(--text);
+    font-size: 1.12rem;
+}
+
+.risk-pill {
+    display: inline-flex;
+    align-items: center;
+    margin-top: 18px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    font-weight: 800;
+    font-size: 0.82rem;
+    letter-spacing: 0.04em;
+}
+
+.risk-pill.hot {
+    color: var(--red);
+    border-color: rgba(255, 101, 120, 0.48);
+    background: rgba(255, 101, 120, 0.1);
+}
+
+.risk-pill.ready {
+    color: var(--green);
+    border-color: rgba(72, 226, 154, 0.48);
+    background: rgba(72, 226, 154, 0.1);
+}
+
+.status-strip {
+    margin: 16px 0 12px;
+    padding: 14px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--line);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+}
+
+.status-strip.hot {
+    border-color: rgba(255, 101, 120, 0.42);
+    background: rgba(255, 101, 120, 0.08);
+}
+
+.status-strip.ready {
+    border-color: rgba(72, 226, 154, 0.36);
+    background: rgba(72, 226, 154, 0.07);
+}
+
+div[data-testid="metric-container"] {
+    padding: 15px 16px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: linear-gradient(145deg, rgba(17, 25, 34, 0.96), rgba(8, 12, 17, 0.98));
+    box-shadow: 0 16px 38px rgba(0, 0, 0, 0.34);
+}
+
+div[data-testid="stDataFrame"] {
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 16px 42px rgba(0, 0, 0, 0.24);
+}
+
+.stButton > button {
+    width: 100%;
+    border: 1px solid rgba(95, 225, 255, 0.42);
+    border-radius: 8px;
+    color: #031014;
+    background: linear-gradient(135deg, #5fe1ff, #48e29a);
+    font-weight: 800;
+}
+
+@media (max-width: 900px) {
+    .deck-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+</style>
+"""
 
 
 def render_interface(transactions: list[dict], results: list[dict]) -> None:
@@ -18,6 +223,7 @@ def render_interface(transactions: list[dict], results: list[dict]) -> None:
         st.info("Aucune transaction a analyser.")
         return
 
+    _render_command_deck(data)
     _render_decision_summary(data)
     filtered = _render_filters(data)
 
@@ -40,6 +246,280 @@ def render_interface(transactions: list[dict], results: list[dict]) -> None:
 
     with patterns_tab:
         _render_patterns(data)
+
+
+def _apply_theme() -> None:
+    st.markdown(APP_STYLE, unsafe_allow_html=True)
+
+
+def _render_command_deck(data: pd.DataFrame) -> None:
+    total = len(data)
+    suspicious = int(data["is_suspicious"].sum())
+    critical = int((data["fraud_score"] >= 0.85).sum())
+    top_row = data.sort_values("fraud_score", ascending=False).iloc[0]
+    top_tx = escape(str(top_row["transaction_id"]))
+    top_reason = escape(str(top_row["reason"]))
+    top_score = float(top_row["fraud_score"])
+    top_amount = escape(str(top_row["amount_display"]))
+    status_class = "hot" if suspicious else "ready"
+    status_label = "ALERTES ACTIVES" if suspicious else "LOT CONFORME"
+
+    left, right = st.columns([1.45, 0.9])
+    with left:
+        st.markdown(
+            f"""
+            <div class="command-deck">
+                <div class="deck-overline">INTELO2026 / Fraud Ops</div>
+                <div class="deck-title">Console de detection</div>
+                <div class="deck-text">
+                    Priorite actuelle: transaction <strong>{top_tx}</strong>,
+                    score <strong>{top_score:.2f}</strong>. {top_reason}
+                </div>
+                <div class="risk-pill {status_class}">{status_label}</div>
+                <div class="deck-grid">
+                    <div class="deck-cell">
+                        <span>Transactions</span>
+                        <strong>{total}</strong>
+                    </div>
+                    <div class="deck-cell">
+                        <span>Alertes</span>
+                        <strong>{suspicious}</strong>
+                    </div>
+                    <div class="deck-cell">
+                        <span>Critiques</span>
+                        <strong>{critical}</strong>
+                    </div>
+                    <div class="deck-cell">
+                        <span>Montant focus</span>
+                        <strong>{top_amount}</strong>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with right:
+        components.html(
+            _scanner_html(total=total, suspicious=suspicious, top_score=top_score),
+            height=270,
+            scrolling=False,
+        )
+
+
+def _scanner_html(total: int, suspicious: int, top_score: float) -> str:
+    alert_ratio = suspicious / total if total else 0.0
+    score_text = escape(f"{top_score:.2f}")
+    alert_text = escape(str(suspicious))
+    ratio_text = escape(f"{alert_ratio:.0%}")
+    return f"""
+    <!doctype html>
+    <html>
+    <head>
+    <meta charset="utf-8" />
+    <style>
+        html, body {{
+            margin: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: transparent;
+            font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            color: #edf6fb;
+        }}
+
+        .scene {{
+            position: relative;
+            height: 250px;
+            border: 1px solid rgba(95, 225, 255, 0.34);
+            border-radius: 10px;
+            background:
+                linear-gradient(180deg, rgba(18, 28, 38, 0.92), rgba(5, 7, 10, 0.98)),
+                #05070a;
+            box-shadow:
+                0 28px 80px rgba(0, 0, 0, 0.52),
+                inset 0 1px 0 rgba(255, 255, 255, 0.08);
+            perspective: 900px;
+            transform-style: preserve-3d;
+        }}
+
+        .grid {{
+            position: absolute;
+            inset: 0;
+            background-image:
+                linear-gradient(rgba(95, 225, 255, 0.08) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(95, 225, 255, 0.06) 1px, transparent 1px);
+            background-size: 26px 26px;
+            transform: rotateX(68deg) translateY(44px) translateZ(-80px);
+            transform-origin: center bottom;
+            opacity: 0.5;
+        }}
+
+        .core {{
+            position: absolute;
+            left: 50%;
+            top: 47%;
+            width: 112px;
+            height: 112px;
+            transform-style: preserve-3d;
+            transform: translate(-50%, -50%) rotateX(-18deg) rotateY(38deg);
+            animation: spin 9s linear infinite;
+        }}
+
+        .face {{
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            border: 1px solid rgba(95, 225, 255, 0.58);
+            background: rgba(8, 18, 25, 0.74);
+            box-shadow: inset 0 0 28px rgba(95, 225, 255, 0.08);
+            font-weight: 900;
+            letter-spacing: 0.04em;
+            color: #5fe1ff;
+            text-shadow: 0 0 18px rgba(95, 225, 255, 0.55);
+        }}
+
+        .front {{ transform: translateZ(56px); }}
+        .back {{ transform: rotateY(180deg) translateZ(56px); }}
+        .right {{ transform: rotateY(90deg) translateZ(56px); }}
+        .left {{ transform: rotateY(-90deg) translateZ(56px); }}
+        .top {{ transform: rotateX(90deg) translateZ(56px); }}
+        .bottom {{ transform: rotateX(-90deg) translateZ(56px); }}
+
+        .ring {{
+            position: absolute;
+            left: 50%;
+            top: 48%;
+            width: 190px;
+            height: 190px;
+            border: 1px solid rgba(72, 226, 154, 0.48);
+            border-radius: 50%;
+            transform: translate(-50%, -50%) rotateX(72deg);
+            box-shadow: 0 0 30px rgba(72, 226, 154, 0.1);
+            animation: pulse 2.7s ease-in-out infinite;
+        }}
+
+        .ring.two {{
+            width: 236px;
+            height: 236px;
+            border-color: rgba(255, 202, 103, 0.34);
+            animation-delay: 0.55s;
+        }}
+
+        .scan {{
+            position: absolute;
+            left: 8%;
+            right: 8%;
+            top: 52%;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, #5fe1ff, transparent);
+            box-shadow: 0 0 18px rgba(95, 225, 255, 0.78);
+            animation: sweep 2.4s ease-in-out infinite;
+        }}
+
+        .hud {{
+            position: absolute;
+            left: 18px;
+            right: 18px;
+            bottom: 16px;
+            display: grid;
+            grid-template-columns: repeat(3, minmax(0, 1fr));
+            gap: 9px;
+        }}
+
+        .hud div {{
+            padding: 10px;
+            border: 1px solid rgba(161, 190, 205, 0.18);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.045);
+        }}
+
+        .hud span {{
+            display: block;
+            color: #91a7b5;
+            font-size: 11px;
+        }}
+
+        .hud strong {{
+            display: block;
+            margin-top: 5px;
+            color: #edf6fb;
+            font-size: 18px;
+        }}
+
+        @keyframes spin {{
+            from {{ transform: translate(-50%, -50%) rotateX(-18deg) rotateY(0deg); }}
+            to {{ transform: translate(-50%, -50%) rotateX(-18deg) rotateY(360deg); }}
+        }}
+
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 0.46; transform: translate(-50%, -50%) rotateX(72deg) scale(0.96); }}
+            50% {{ opacity: 0.9; transform: translate(-50%, -50%) rotateX(72deg) scale(1.04); }}
+        }}
+
+        @keyframes sweep {{
+            0%, 100% {{ transform: translateY(-62px); opacity: 0.25; }}
+            50% {{ transform: translateY(54px); opacity: 1; }}
+        }}
+    </style>
+    </head>
+    <body>
+        <div class="scene" role="img" aria-label="Visualisation 3D du risque de fraude">
+            <div class="grid"></div>
+            <div class="ring"></div>
+            <div class="ring two"></div>
+            <div class="scan"></div>
+            <div class="core">
+                <div class="face front">RISK</div>
+                <div class="face back">OPS</div>
+                <div class="face right">{score_text}</div>
+                <div class="face left">AI</div>
+                <div class="face top">SCAN</div>
+                <div class="face bottom">TX</div>
+            </div>
+            <div class="hud">
+                <div><span>Score max</span><strong>{score_text}</strong></div>
+                <div><span>Alertes</span><strong>{alert_text}</strong></div>
+                <div><span>Ratio</span><strong>{ratio_text}</strong></div>
+            </div>
+        </div>
+    </body>
+    </html>
+    """
+
+
+def _render_decision_summary(data: pd.DataFrame) -> None:
+    total = len(data)
+    suspicious = int(data["is_suspicious"].sum())
+    critical = int((data["fraud_score"] >= 0.85).sum())
+    avg_score = float(data["fraud_score"].mean())
+    fraud_rate = suspicious / total if total else 0.0
+
+    top_alert = data.sort_values("fraud_score", ascending=False).iloc[0]
+    if suspicious:
+        action = (
+            f"Priorite: verifier {top_alert['transaction_id']} "
+            f"avant les autres dossiers."
+        )
+    else:
+        action = "Aucune alerte active dans ce lot."
+
+    status_class = "hot" if suspicious else "ready"
+    st.markdown(
+        f'<div class="status-strip {status_class}">{escape(action)}</div>',
+        unsafe_allow_html=True,
+    )
+    st.caption(
+        "Le moteur combine anomalies de montant, donnees manquantes, frequence, "
+        "doublons et coherence geographique."
+    )
+
+    col_a, col_b, col_c, col_d = st.columns(4)
+    col_a.metric("Transactions", total, "lot analyse")
+    col_b.metric("Alertes", suspicious, f"{fraud_rate:.0%} du lot")
+    col_c.metric("Critiques", critical, "score >= 0.85")
+    col_d.metric("Score moyen", f"{avg_score:.2f}", "risque global")
 
 
 def _build_dataframe(transactions: list[dict], results: list[dict]) -> pd.DataFrame:
@@ -97,38 +577,6 @@ def _build_dataframe(transactions: list[dict], results: list[dict]) -> pd.DataFr
     data["time_display"] = data["timestamp_dt"].apply(_format_timestamp)
     data["search_text"] = data.apply(_search_text, axis=1)
     return data
-
-
-def _render_decision_summary(data: pd.DataFrame) -> None:
-    total = len(data)
-    suspicious = int(data["is_suspicious"].sum())
-    critical = int((data["fraud_score"] >= 0.85).sum())
-    avg_score = float(data["fraud_score"].mean())
-    fraud_rate = suspicious / total if total else 0.0
-
-    top_alert = data.sort_values("fraud_score", ascending=False).iloc[0]
-    if suspicious:
-        action = (
-            f"Priorite: verifier {top_alert['transaction_id']} "
-            f"avant les autres dossiers."
-        )
-    else:
-        action = "Aucune alerte active dans ce lot."
-
-    if suspicious:
-        st.warning(action)
-    else:
-        st.success(action)
-    st.caption(
-        "Le moteur combine anomalies de montant, donnees manquantes, frequence, "
-        "doublons et coherence geographique."
-    )
-
-    col_a, col_b, col_c, col_d = st.columns(4)
-    col_a.metric("Transactions", total, "lot analyse")
-    col_b.metric("Alertes", suspicious, f"{fraud_rate:.0%} du lot")
-    col_c.metric("Critiques", critical, "score >= 0.85")
-    col_d.metric("Score moyen", f"{avg_score:.2f}", "risque global")
 
 
 def _render_filters(data: pd.DataFrame) -> pd.DataFrame:
@@ -491,9 +939,10 @@ def main() -> None:
         page_title="Detection de fraude - Hackathon INTELO2026",
         layout="wide",
     )
+    _apply_theme()
 
     st.title("Detection de fraude financiere")
-    st.caption("Hackathon INTELO2026 - analyse automatique des transactions")
+    st.caption("Hackathon INTELO2026 - console d'analyse automatique des transactions")
 
     with st.sidebar:
         st.header("Donnees")
